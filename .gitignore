@@ -1,0 +1,5 @@
+# void-sector .gitignore
+.DS_Store
+Thumbs.db
+*.log
+node_modules/
