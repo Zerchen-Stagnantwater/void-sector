@@ -1,0 +1,109 @@
+/* ============================================
+   VOID SECTOR — style.css
+   CRT terminal aesthetic. Green phosphor on black.
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+/* ---------- Reset & Base ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+}
+
+/* ---------- Game Wrapper ---------- */
+#game-wrapper {
+  position: relative;
+  display: inline-block;
+  /* Soft outer glow — like a real CRT tube */
+  filter: drop-shadow(0 0 18px #00ff4155) drop-shadow(0 0 60px #00ff4118);
+}
+
+/* ---------- Canvas ---------- */
+#gameCanvas {
+  display: block;
+  background: #000;
+  /* Pixel-perfect rendering for the ASCII chars */
+  image-rendering: pixelated;
+}
+
+/* ---------- Scanlines overlay ---------- */
+#scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  background: repeating-linear-gradient(to bottom,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.18) 2px,
+      rgba(0, 0, 0, 0.18) 4px);
+  animation: scanroll 10s linear infinite;
+}
+
+@keyframes scanroll {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: 0 100px;
+  }
+}
+
+/* ---------- CRT Vignette ---------- */
+#crt-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 11;
+  background: radial-gradient(ellipse at center,
+      transparent 60%,
+      rgba(0, 0, 0, 0.72) 100%);
+}
+
+/* ---------- Screen flicker (subtle) ---------- */
+#game-wrapper {
+  animation: flicker 0.15s infinite alternate;
+}
+
+@keyframes flicker {
+  0% {
+    opacity: 1.0;
+  }
+
+  92% {
+    opacity: 1.0;
+  }
+
+  93% {
+    opacity: 0.97;
+  }
+
+  94% {
+    opacity: 1.0;
+  }
+
+  96% {
+    opacity: 0.98;
+  }
+
+  100% {
+    opacity: 1.0;
+  }
+}
