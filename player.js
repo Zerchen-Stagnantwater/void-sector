@@ -122,6 +122,12 @@ const Player = (() => {
     _handleCombo();
     _handlePendingLifeUp(gameState);
     _handleBomb();
+
+    // Breach damage — enemy reached bottom, forced hit
+    if (gameState._breachDamage) {
+      gameState._breachDamage = false;
+      _takeDamage(gameState);
+    }
   }
 
   // ---------- Movement ----------
@@ -216,7 +222,7 @@ const Player = (() => {
   function _handleEnemyCollision(gameState) {
     if (invincible) return;
 
-    const enemies = gameState.enemies || [];
+    const enemies = Enemies.getActive();
     for (const e of enemies) {
       if (!e.active) continue;
       const dx = Math.abs(e.x - x);
@@ -380,6 +386,8 @@ const Player = (() => {
     return rollCooldown / C.PLAYER.ROLL_COOLDOWN;
   }
 
+  function getRollDir() { return rollDir; }
+
   return {
     init,
     resetPosition,
@@ -390,7 +398,7 @@ const Player = (() => {
     getX, getY,
     getLives, getScore, getCombo, getKills,
     isRolling, isInvincible, isDead, getDeathTimer,
-    getUpgrades, getRollCooldownFrac,
+    getUpgrades, getRollCooldownFrac, getRollDir,
   };
 
 })();

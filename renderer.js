@@ -343,8 +343,9 @@ const Renderer = (() => {
 
     // Roll streak — draw afterimage behind player
     if (Player.isRolling()) {
-      _drawChar(C.PLAYER.CHAR, px - Player._rollDir * 0.8, py, C.COLOR.DIM, 0.3);
-      _drawChar(C.PLAYER.CHAR, px - Player._rollDir * 1.6, py, C.COLOR.DIM, 0.12);
+      const rd = Player.getRollDir();
+      _drawChar(C.PLAYER.CHAR, px - rd * 0.8, py, C.COLOR.DIM, 0.3);
+      _drawChar(C.PLAYER.CHAR, px - rd * 1.6, py, C.COLOR.DIM, 0.12);
     }
 
     // Player char — bright during spread, accent during rapid
