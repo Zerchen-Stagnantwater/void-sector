@@ -24,74 +24,75 @@ const Waves = (() => {
   const WAVE_DEFS = [
 
     // Wave 1 — Tutorial. Just grunts, slow trickle.
-    () => _formation_line('A', 5, 1, 60, 50),
+    // spacing 8 = 4 gaps across 44 cols, fits cleanly
+    () => _formation_line('A', 5, 1, 8, 50),
 
     // Wave 2 — More grunts, two rows.
     () => [
-      ..._formation_line('A', 6, 2, 60, 45),
-      ..._formation_line('A', 4, 4, 60, 45, 200),
+      ..._formation_line('A', 5, 1, 8, 40),
+      ..._formation_line('A', 4, 3, 9, 40, 180),
     ],
 
     // Wave 3 — Introduce Dasher.
     () => [
-      ..._formation_line('A', 4, 2, 55, 45),
-      ..._formation_scatter('B', 2, 240),
+      ..._formation_line('A', 4, 1, 9, 45),
+      ..._formation_scatter('B', 2, 220),
     ],
 
     // Wave 4 — More Dashers, pressure ramps.
     () => [
       ..._formation_scatter('A', 4, 0),
-      ..._formation_scatter('B', 4, 180),
+      ..._formation_scatter('B', 4, 160),
     ],
 
     // Wave 5 — Introduce Tank. Mini-boss feel.
     () => [
-      ..._formation_line('A', 5, 2, 50, 45),
-      { type: 'C', col: Math.floor(C.COLS / 2), row: 0, delay: 120 },
+      ..._formation_line('A', 4, 1, 9, 40),
+      { type: 'C', col: Math.floor(C.COLS / 2), row: 0, delay: 100 },
     ],
 
     // Wave 6 — Mixed. Real chaos starts.
     () => [
-      ..._formation_line('A', 4, 2, 50, 40),
-      ..._formation_scatter('B', 3, 100),
-      { type: 'C', col: 15, row: 0, delay: 200 },
-      { type: 'C', col: 45, row: 0, delay: 200 },
+      ..._formation_line('A', 4, 1, 9, 35),
+      ..._formation_scatter('B', 3, 90),
+      { type: 'C', col: 10, row: 0, delay: 180 },
+      { type: 'C', col: 34, row: 0, delay: 180 },
     ],
 
     // Wave 7 — Introduce Bomber.
     () => [
       ..._formation_scatter('A', 5, 0),
-      ..._formation_scatter('B', 2, 150),
-      { type: 'D', col: Math.floor(C.COLS / 2), row: 0, delay: 80 },
+      ..._formation_scatter('B', 2, 130),
+      { type: 'D', col: Math.floor(C.COLS / 2), row: 0, delay: 70 },
     ],
 
     // Wave 8 — Twin Bombers + support.
     () => [
-      ..._formation_line('A', 3, 2, 45, 40),
-      { type: 'D', col: 18, row: 0, delay: 60 },
-      { type: 'D', col: 42, row: 0, delay: 60 },
-      ..._formation_scatter('B', 3, 200),
+      ..._formation_line('A', 3, 1, 10, 35),
+      { type: 'D', col: 12, row: 0, delay: 50 },
+      { type: 'D', col: 32, row: 0, delay: 50 },
+      ..._formation_scatter('B', 3, 180),
     ],
 
     // Wave 9 — Tank swarm.
     () => [
-      { type: 'C', col: 10, row: 0, delay: 0 },
-      { type: 'C', col: 25, row: 0, delay: 60 },
-      { type: 'C', col: 40, row: 0, delay: 60 },
-      { type: 'C', col: 55, row: 0, delay: 120 },
-      ..._formation_scatter('A', 6, 240),
+      { type: 'C', col: 8, row: 0, delay: 0 },
+      { type: 'C', col: 20, row: 0, delay: 60 },
+      { type: 'C', col: 32, row: 0, delay: 60 },
+      { type: 'C', col: 42, row: 0, delay: 120 },
+      ..._formation_scatter('A', 5, 220),
     ],
 
     // Wave 10 — BOSS WAVE. All types, maximum pressure.
     () => [
-      ..._formation_line('A', 6, 2, 40, 38),
-      ..._formation_scatter('B', 4, 120),
-      { type: 'C', col: 12, row: 0, delay: 180 },
-      { type: 'C', col: 48, row: 0, delay: 180 },
-      { type: 'D', col: 20, row: 0, delay: 240 },
-      { type: 'D', col: 40, row: 0, delay: 240 },
-      ..._formation_scatter('B', 3, 360),
-      { type: 'C', col: Math.floor(C.COLS / 2), row: 0, delay: 420 },
+      ..._formation_line('A', 5, 1, 8, 35),
+      ..._formation_scatter('B', 4, 110),
+      { type: 'C', col: 8, row: 0, delay: 160 },
+      { type: 'C', col: 36, row: 0, delay: 160 },
+      { type: 'D', col: 14, row: 0, delay: 220 },
+      { type: 'D', col: 30, row: 0, delay: 220 },
+      ..._formation_scatter('B', 3, 340),
+      { type: 'C', col: Math.floor(C.COLS / 2), row: 0, delay: 400 },
     ],
 
   ];
