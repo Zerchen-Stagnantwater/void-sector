@@ -438,23 +438,35 @@ const Renderer = (() => {
       `[ WAVE ${state.wave} COMPLETE ]`,
       CH * 1.5, C.COLOR.PRIMARY, 1, C.FONT_SIZE * 1.1, true
     );
+
+    // Credits available — large, bright, impossible to miss
+    const credits = Player.getScore();
+    const selItem = state.items[state.cursor];
+    const canAfford = selItem && selItem.cost !== null && credits >= selItem.cost;
+    // Pulse green when you can afford selected item, amber when you can't
+    const creditColor = canAfford ? C.COLOR.ACCENT : C.COLOR.WARN;
+
     _drawTextCentered(
-      `SCORE  ${_pad(Player.getScore(), 8)}`,
-      CH * 2.9, C.COLOR.ACCENT, 0.85, C.FONT_SIZE * 0.85
+      `CREDITS`,
+      CH * 2.7, C.COLOR.DIM, 0.7, C.FONT_SIZE * 0.72
+    );
+    _drawTextCentered(
+      `${credits} cr`,
+      CH * 3.7, creditColor, 1, C.FONT_SIZE * 1.3, true
     );
 
     // Divider
     _setFont(C.FONT_SIZE * 0.7);
     ctx.fillStyle = C.COLOR.DIM;
     ctx.globalAlpha = 0.5;
-    ctx.fillText('─'.repeat(Math.floor(C.COLS * 0.9)), CW * 0.5, CH * 3.7);
+    ctx.fillText('─'.repeat(Math.floor(C.COLS * 0.9)), CW * 0.5, CH * 4.7);
     ctx.globalAlpha = 1;
 
     // Upgrade heading
-    _drawTextCentered('UPGRADES', CH * 4.6, C.COLOR.DIM, 0.7, C.FONT_SIZE * 0.8);
+    _drawTextCentered('UPGRADES', CH * 5.5, C.COLOR.DIM, 0.7, C.FONT_SIZE * 0.8);
 
     // Items
-    const startY = CH * 5.8;
+    const startY = CH * 6.6;
     const lineH = CH * 1.55;
 
     for (let i = 0; i < state.items.length; i++) {
