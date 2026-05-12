@@ -23,26 +23,22 @@ const Waves = (() => {
 
   const WAVE_DEFS = [
 
-    // Wave 1 — Tutorial. Just grunts, slow trickle.
-    // spacing 8 = 4 gaps across 44 cols, fits cleanly
-    () => _formation_line('A', 5, 1, 8, 50),
+    // Wave 1 — Tutorial. 3 grunts = 150 score max. Can't afford anything yet.
+    () => _formation_line('A', 3, 1, 12, 60),
 
-    // Wave 2 — More grunts, two rows.
+    // Wave 2 — 4 grunts = 200 score. Saving up.
+    () => _formation_line('A', 4, 1, 10, 50),
+
+    // Wave 3 — First dasher appears. ~300 total score by now, first upgrade close.
     () => [
-      ..._formation_line('A', 5, 1, 8, 40),
-      ..._formation_line('A', 4, 3, 9, 40, 180),
+      ..._formation_line('A', 3, 1, 12, 50),
+      ..._formation_scatter('B', 1, 240),
     ],
 
-    // Wave 3 — Introduce Dasher.
+    // Wave 4 — More pressure. Two dashers + grunts.
     () => [
-      ..._formation_line('A', 4, 1, 9, 45),
-      ..._formation_scatter('B', 2, 220),
-    ],
-
-    // Wave 4 — More Dashers, pressure ramps.
-    () => [
-      ..._formation_scatter('A', 4, 0),
-      ..._formation_scatter('B', 4, 160),
+      ..._formation_scatter('A', 3, 0),
+      ..._formation_scatter('B', 2, 160),
     ],
 
     // Wave 5 — Introduce Tank. Mini-boss feel.

@@ -29,13 +29,17 @@ const Powerups = (() => {
     const t = type || _randomType();
     const def = C.POWERUP;
 
+    // Spawn at mid-screen — enemies die near top, drop would
+    // never reach the player before wave ends at old spawn pos.
+    const spawnY = Math.max(row, Math.floor(C.ROWS * 0.38));
+
     _drops.push({
       x: col,
-      y: row,
+      y: spawnY,
       type: t,
       char: def.CHARS[t],
       color: def.COLORS[t],
-      life: 420,   // Auto-despawn after 7 seconds (420 frames)
+      life: 480,   // 8 seconds
     });
   }
 
