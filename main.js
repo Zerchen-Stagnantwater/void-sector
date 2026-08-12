@@ -1,275 +1,306 @@
 // ============================================
-//   VOID SECTOR — main.js
-//   The game loop and state machine.
-//   Wires every system together.
-//   Nothing renders or updates without
-//   passing through here first.
+//   VOID SECTOR — main.js (MULTIPLAYER)
+//   Game loop and state machine.
+//   No simulation runs here anymore.
+//   Loop does three things per frame:
+//     1. Send input to server
+//     2. Apply latest server state
+//     3. Render
 // ============================================
 
-// ---------- Game state machine ----------
-// MENU → PLAYING → SHOP → PLAYING → ... → GAMEOVER → MENU
-
 const SCREEN = {
-  MENU: 'MENU',
-  PLAYING: 'PLAYING',
-  SHOP: 'SHOP',
-  GAMEOVER: 'GAMEOVER',
+  LOBBY: "LOBBY",
+  PLAYING: "PLAYING",
+  SHOP: "SHOP",
+  GAMEOVER: "GAMEOVER",
+  DYING: "DYING",
 };
 
 // ---------- Shared game state ----------
-// Passed into every system's update() each frame.
-// Systems write flags here; main.js reads and acts on them.
+// Populated entirely by server broadcasts.
+// Client never writes game logic into this.
 
 let gameState = {
-  screen: SCREEN.MENU,
+  screen: SCREEN.LOBBY,
   frame: 0,
   wave: 0,
+  myId: null,
+  roomCode: null,
 
-  // Flags written by systems, read by main each frame
-  playerDead: false,
-  justHit: false,
-  waveComplete: false,
-  enemyBreached: false,
-  enemiesKilledThisWave: 0,
-  pendingLifeUp: false,
+  players: [],
+  enemies: [],
+  bullets: [],
+  drops: [],
+  shopState: null,
 
-  // Written by shop, read by main
-  spendScore: 0,
-
-  // Written by player, read by renderer
-  playerX: C.PLAYER.START_COL,
-  playerY: C.PLAYER.START_ROW,
-
-  // Game over data
-  finalStats: null,
   newHighScore: false,
+  finalStats: null,
+  _reconnecting: false,
 };
 
-// ---------- Score shadow ----------
-// Player holds the authoritative score internally.
-// main.js applies shop deductions here so shop stays decoupled.
-let _pendingSpend = 0;
+// ---------- Player identity ----------
 
-// ---------- Transition helpers ----------
+const PLAYER_IDENTITY = [
+  { id: 0, char: "^", color: "#00ff41" },
+  { id: 1, char: "^", color: "#00ccff" },
+  { id: 2, char: "^", color: "#ffaa00" },
+  { id: 3, char: "^", color: "#ff00aa" },
+];
 
-function _gotoMenu() {
-  gameState.screen = SCREEN.MENU;
-  _resetAll();
+// ---------- Server message handlers ----------
+
+function _registerNetHandlers() {
+  Net.on("state", (msg) => {
+    if (gameState.screen !== SCREEN.PLAYING && gameState.screen !== SCREEN.SHOP)
+      return;
+
+    gameState.wave = msg.wave;
+    gameState.players = msg.players || [];
+    gameState.enemies = msg.enemies || [];
+    gameState.bullets = msg.bullets || [];
+    gameState.drops = msg.drops || [];
+    gameState.shopState = msg.shopState || null;
+
+    if (msg.roomState === "SHOP" && gameState.screen !== SCREEN.SHOP) {
+      _enterShop();
+    }
+    if (msg.roomState === "PLAYING" && gameState.screen !== SCREEN.PLAYING) {
+      gameState.screen = SCREEN.PLAYING;
+      gameState.shopState = null;
+      Audio.play("waveStart");
+    }
+  });
+
+  Net.on("event", (msg) => {
+    _handleServerEvent(msg);
+  });
+
+  Net.on("wave_start", (msg) => {
+    gameState.wave = msg.wave;
+    gameState.screen = SCREEN.PLAYING;
+    Audio.play("waveStart");
+    if (msg.wave > 1) UI.showWaveClear(msg.wave - 1);
+  });
+
+  Net.on("shop_result", (msg) => {
+    Shop.applyResult(msg);
+  });
+
+  Net.on("game_over", (msg) => {
+    _enterGameOver(msg);
+  });
+
+  Net.on("player_left", (msg) => {
+    Audio.play("menuMove");
+    Particles.spawnFloatText(
+      C.COLS / 2,
+      C.ROWS / 2,
+      "P" + (msg.playerId + 1) + " LEFT",
+      { color: PLAYER_IDENTITY[msg.playerId]?.color || C.COLOR.DIM },
+    );
+  });
+
+  Net.on("disconnected", () => {
+    if (gameState.screen === SCREEN.LOBBY) return;
+    gameState._reconnecting = true;
+  });
+
+  Net.on("connected", () => {
+    gameState._reconnecting = false;
+  });
 }
 
-function _startGame() {
-  _resetAll();
-  Player.init();
-  gameState.screen = SCREEN.PLAYING;
-  gameState.wave = 0;
-  Audio.unlock();
-  _startNextWave();
-}
+// ---------- Server event -> local juice ----------
 
-function _startNextWave() {
-  gameState.wave += 1;
-  gameState.waveComplete = false;
-  gameState.enemiesKilledThisWave = 0;
-  gameState.enemyBreached = false;
+function _handleServerEvent(msg) {
+  const event = msg.event;
+  const x = msg.x;
+  const y = msg.y;
+  const data = msg.data || {};
 
-  Enemies.reset();
-  Bullets.reset();
-  Powerups.reset();
-  Player.resetPosition();
-  Particles.reset();
+  switch (event) {
+    case "enemy_die":
+      Particles.spawnExplosion(x, y, {
+        color: _enemyColor(data.enemyType),
+        count: data.enemyType === "C" ? 18 : C.PARTICLE.EXPLOSION_COUNT,
+      });
+      Particles.shake(C.SHAKE.HIT_INTENSITY);
+      Audio.play("enemyDie");
+      if (data.playerId === gameState.myId) {
+        const label =
+          data.multiplier > 1
+            ? "+" + data.score + " x" + data.multiplier
+            : "+" + data.score;
+        Particles.spawnFloatText(x, y, label, {
+          color: data.multiplier > 1 ? C.COLOR.ACCENT : C.COLOR.PRIMARY,
+        });
+      }
+      break;
 
-  Waves.startWave(gameState.wave);
-  Audio.play('waveStart');
-}
+    case "enemy_hit":
+      Particles.spawnHitSpark(x, y, { color: _enemyColor(data.enemyType) });
+      Audio.play("enemyHit");
+      break;
 
-function _gotoShop() {
-  gameState.screen = SCREEN.SHOP;
-  UI.showWaveClear(gameState.wave);
+    case "player_hit":
+      if (data.playerId === gameState.myId) {
+        Particles.flash(C.COLOR.DANGER, 0.35);
+        Particles.shake(C.SHAKE.HIT_INTENSITY);
+      }
+      Particles.spawnExplosion(x, y, { color: C.COLOR.DANGER, count: 8 });
+      Audio.play("playerHit");
+      break;
 
-  // Wave clear score bonus (scales with wave)
-  const bonus = C.SCORE.WAVE_CLEAR_BONUS + (gameState.wave - 1) * 100;
-  _addScore(bonus);
+    case "player_die":
+      Particles.spawnExplosion(x, y, {
+        color: PLAYER_IDENTITY[data.playerId]?.color || C.COLOR.DANGER,
+        count: C.PARTICLE.EXPLOSION_COUNT * 2,
+        spread: 2.0,
+      });
+      Particles.shake(C.SHAKE.DEATH_INTENSITY);
+      if (data.playerId === gameState.myId) {
+        Particles.flash(C.COLOR.DANGER, 0.8);
+      }
+      Audio.play("playerDie");
+      break;
 
-  Shop.open(gameState.wave);
-  Audio.play('waveClear');
-}
+    case "shield_hit":
+      Particles.spawnExplosion(x, y, { color: C.COLOR.SHIELD, count: 6 });
+      Particles.flash(C.COLOR.SHIELD, 0.25);
+      Audio.play("shieldHit");
+      break;
 
-function _addScore(amount) {
-  // Score lives inside Player — we proxy additions through registerKill
-  // for normal play, but for bonuses we use a direct internal add.
-  // Since Player doesn't expose addScore we track it here via a side table.
-  // Simpler: expose addScore on Player.
-  Player._addBonus(amount);
-}
+    case "pickup":
+      Audio.play("pickup");
+      if (data.playerId === gameState.myId) {
+        const labels = {
+          RAPID: "RAPID FIRE!",
+          SPREAD: "SPREAD SHOT!",
+          SHIELD: "SHIELD UP!",
+          BOMB: "BOMB +1",
+          LIFE: "EXTRA LIFE!",
+        };
+        Particles.spawnFloatText(
+          x,
+          y - 2,
+          labels[data.pickupType] || data.pickupType,
+          {
+            color: C.POWERUP.COLORS[data.pickupType],
+          },
+        );
+        if (data.pickupType === "LIFE") Particles.flash(C.COLOR.PRIMARY, 0.3);
+        if (data.pickupType === "SHIELD") Particles.flash(C.COLOR.SHIELD, 0.25);
+      }
+      break;
 
-function _gotoGameOver() {
-  gameState.screen = SCREEN.GAMEOVER;
-  gameState.frame = 0;
+    case "bomb":
+      Particles.flash(C.COLOR.WARN, 0.6);
+      Particles.shake(C.SHAKE.DEATH_INTENSITY * 0.7);
+      Audio.play("bomb");
+      break;
 
-  gameState.finalStats = {
-    score: Player.getScore(),
-    wave: gameState.wave,
-    kills: Player.getKills(),
-  };
-
-  const wasNewHigh = Save.submitRun(gameState.finalStats);
-  gameState.newHighScore = wasNewHigh;
-
-  if (wasNewHigh) {
-    setTimeout(() => Audio.play('highScore'), 400);
+    case "wave_clear":
+      Audio.play("waveClear");
+      break;
   }
 }
 
-function _resetAll() {
-  Player.init();
-  Enemies.reset();
-  Bullets.reset();
-  Powerups.reset();
-  Particles.reset();
-  Waves.reset();
-  Shop.reset();
-  UI.reset();
+function _enemyColor(type) {
+  return type && C.ENEMY[type] ? C.ENEMY[type].COLOR : C.COLOR.PRIMARY;
+}
 
-  gameState.playerDead = false;
-  gameState.justHit = false;
-  gameState.waveComplete = false;
-  gameState.enemyBreached = false;
-  gameState.enemiesKilledThisWave = 0;
-  gameState.pendingLifeUp = false;
-  gameState.spendScore = 0;
-  gameState.finalStats = null;
-  gameState.newHighScore = false;
-  gameState.wave = 0;
+// ---------- State transitions ----------
+
+function _enterShop() {
+  gameState.screen = SCREEN.SHOP;
+  Shop.openMulti(gameState.wave, gameState.myId);
+  Audio.play("waveClear");
+  UI.showWaveClear(gameState.wave);
+}
+
+function _enterGameOver(msg) {
+  gameState.screen = SCREEN.GAMEOVER;
+  gameState.frame = 0;
+  gameState.finalStats = {
+    stats: msg.stats || [],
+    wave: msg.wave || gameState.wave,
+  };
+
+  const myStats = (msg.stats || []).find((s) => s.id === gameState.myId);
+  if (myStats) {
+    const wasNewHigh = Save.submitRun({
+      score: myStats.score,
+      wave: msg.wave,
+      kills: myStats.kills,
+    });
+    gameState.newHighScore = wasNewHigh;
+    if (wasNewHigh) setTimeout(() => Audio.play("highScore"), 400);
+  }
 }
 
 // ---------- Per-screen update ----------
 
-function _updateMenu() {
-  if (Input.pressed.confirm) {
+function _updateLobby() {
+  Lobby.update();
+
+  if (window._gameStartMsg) {
+    const msg = window._gameStartMsg;
+    window._gameStartMsg = null;
+
+    gameState.myId = Lobby.getMyId();
+    gameState.roomCode = Lobby.getRoomCode();
+    gameState.screen = SCREEN.PLAYING;
+    gameState.wave = msg.wave || 1;
+    gameState.players = msg.players || [];
+    gameState.enemies = [];
+    gameState.bullets = [];
+    gameState.drops = [];
+
+    Audio.play("waveStart");
     Audio.unlock();
-    Audio.play('menuConfirm');
-    _startGame();
   }
 }
 
 function _updatePlaying() {
-  // Pause toggle
-  if (Input.pressed.pause) {
-    UI.togglePause();
-  }
+  if (Input.pressed.pause) UI.togglePause();
 
-  // If paused, let UI handle input and nothing else
   if (UI.isPaused()) {
-    const uiResult = UI.update(gameState);
-    if (uiResult === 'quit') {
-      _gotoMenu();
-    }
+    const result = UI.update(gameState);
+    if (result === "quit") _quitToLobby();
     return;
   }
 
-  // --- Sync player position into gameState for enemies ---
-  gameState.playerX = Player.getX();
-  gameState.playerY = Player.getY();
-
-  // --- Update all systems ---
-  Waves.update(gameState);
-  Enemies.update(gameState);
-  Bullets.update();
-  Player.update(gameState);
-
-  // Powerup update — returns array of picked-up types
-  const picked = Powerups.update(
-    Player.getX(), Player.getY(), gameState
-  );
-  _handlePickups(picked);
-
+  Net.sendInput();
   Particles.update();
-
-  // --- Apply shop spend (deferred from last shop visit) ---
-  if (gameState.spendScore > 0) {
-    Player._spendScore(gameState.spendScore);
-    gameState.spendScore = 0;
-  }
-
-  // --- Read flags written by systems ---
-
-  if (gameState.justHit) {
-    gameState.justHit = false;
-    // (shake and flash already applied inside player._takeDamage)
-  }
-
-  if (gameState.enemyBreached) {
-    gameState.enemyBreached = false;
-    // Breached enemy damages player
-    Particles.shake(C.SHAKE.HIT_INTENSITY);
-    Particles.flash(C.COLOR.DANGER, 0.2);
-    Audio.play('playerHit');
-    Player._forceHit(gameState);
-  }
-
-  if (gameState.playerDead) {
-    gameState.playerDead = false;
-    // Wait for death animation before transitioning
-    setTimeout(() => _gotoGameOver(), 1200);
-    gameState.screen = 'DYING'; // Prevent further updates
-    return;
-  }
-
-  if (gameState.waveComplete) {
-    gameState.waveComplete = false;
-    _gotoShop();
-    return;
-  }
 }
 
 function _updateShop() {
-  const leave = Shop.update(gameState);
-
-  // Apply any score spend from this frame
-  if (gameState.spendScore > 0) {
-    Player._spendScore(gameState.spendScore);
-    gameState.spendScore = 0;
-  }
-
-  if (leave) {
-    gameState.screen = SCREEN.PLAYING;
-    _startNextWave();
-  }
+  Shop.updateMulti(gameState);
+  Particles.update();
 }
 
 function _updateGameOver() {
   if (Input.pressed.confirm) {
-    Audio.play('menuConfirm');
-    _gotoMenu();
+    Audio.play("menuConfirm");
+    _quitToLobby();
   }
 }
 
-// ---------- Pickup handling ----------
-
-function _handlePickups(picked) {
-  for (const type of picked) {
-    Audio.play('pickup');
-
-    const labels = {
-      RAPID: 'RAPID FIRE!',
-      SPREAD: 'SPREAD SHOT!',
-      SHIELD: 'SHIELD UP!',
-      BOMB: 'BOMB +1',
-      LIFE: 'EXTRA LIFE!',
-    };
-    Particles.spawnFloatText(
-      Player.getX(), Player.getY() - 2,
-      labels[type] || type,
-      { color: C.POWERUP.COLORS[type] }
-    );
-
-    if (type === 'LIFE') {
-      Particles.flash(C.COLOR.PRIMARY, 0.3);
-    }
-    if (type === 'SHIELD') {
-      Particles.flash(C.COLOR.SHIELD, 0.25);
-    }
-  }
+function _quitToLobby() {
+  gameState.screen = SCREEN.LOBBY;
+  gameState.players = [];
+  gameState.enemies = [];
+  gameState.bullets = [];
+  gameState.drops = [];
+  gameState.shopState = null;
+  gameState.myId = null;
+  gameState.roomCode = null;
+  gameState.wave = 0;
+  gameState.finalStats = null;
+  gameState.newHighScore = false;
+  Particles.reset();
+  UI.reset();
+  Lobby.init();
 }
 
 // ---------- Main loop ----------
@@ -281,98 +312,53 @@ const FIXED_STEP = C.TICK_MS;
 function _loop(timestamp) {
   requestAnimationFrame(_loop);
 
-  const delta = Math.min(timestamp - _lastTime, 50); // Cap at 50ms to avoid spiral of death
+  const delta = Math.min(timestamp - _lastTime, 50);
   _lastTime = timestamp;
-
   _accumulator += delta;
 
-  // Fixed timestep update — decouple logic from frame rate
   while (_accumulator >= FIXED_STEP) {
     _tick();
     _accumulator -= FIXED_STEP;
   }
 
-  // Render once per animation frame (not per tick)
   gameState.frame += 1;
   Renderer.draw(gameState);
   UI.draw(gameState);
+
+  if (gameState.screen === SCREEN.LOBBY) {
+    const canvas = document.getElementById("gameCanvas");
+    Lobby.draw(canvas.getContext("2d"));
+  }
 }
 
 function _tick() {
-  Input.update();   // Flush pressed buffer — must be first
+  Input.update();
 
   switch (gameState.screen) {
-    case SCREEN.MENU: _updateMenu(); break;
-    case SCREEN.PLAYING: _updatePlaying(); break;
-    case SCREEN.SHOP: _updateShop(); break;
-    case SCREEN.GAMEOVER: _updateGameOver(); break;
-    case 'DYING': Particles.update(); break; // Keep particles alive during death
+    case SCREEN.LOBBY:
+      _updateLobby();
+      break;
+    case SCREEN.PLAYING:
+      _updatePlaying();
+      break;
+    case SCREEN.SHOP:
+      _updateShop();
+      break;
+    case SCREEN.GAMEOVER:
+      _updateGameOver();
+      break;
+    case SCREEN.DYING:
+      Particles.update();
+      break;
   }
 }
 
-// ---------- Patch Player with bonus/spend methods ----------
-// These are thin wrappers we add here so player.js
-// stays clean and main.js controls score transactions.
-
-Player._addBonus = function(amount) {
-  // Access the score via the closure — we monkey-patch a direct adder.
-  // Cleaner alternative: expose addScore in player.js.
-  // This works but note it for refactor in Game #2.
-  if (typeof _playerScoreRef !== 'undefined') {
-    _playerScoreRef += amount;
-  }
-  // Since score is private in player.js IIFE we use registerKill with 0 combo:
-  // Actually simplest: just add to score via a proper method.
-  // We'll wire this properly below.
-};
-
-// The cleanest solution: add these two small methods to the Player module.
-// Since JS IIFEs are already executed, we extend the returned object:
-(function _patchPlayer() {
-  // We need internal access to score. The cleanest way at this stage:
-  // re-open the interface by storing score in a shared ref.
-  // For this game we use a simple module-level variable approach:
-  let _bonusScore = 0;
-
-  Player.getBonusScore = function() { return _bonusScore; };
-
-  Player._addBonus = function(amount) {
-    _bonusScore += amount;
-  };
-
-  Player._spendScore = function(amount) {
-    _bonusScore -= amount;
-    if (_bonusScore < 0) _bonusScore = 0;
-  };
-
-  // Override getScore to include bonus
-  const _origGetScore = Player.getScore;
-  Player.getScore = function() {
-    return _origGetScore() + _bonusScore;
-  };
-
-  // Reset bonus on init
-  const _origInit = Player.init;
-  Player.init = function() {
-    _bonusScore = 0;
-    _origInit();
-  };
-
-  // Force hit from breached enemy (bypasses invincibility check)
-  Player._forceHit = function(gs) {
-    // We call the internal damage path by briefly clearing invincibility.
-    // Since _takeDamage is private we trigger via a flag:
-    gs._breachDamage = true;
-  };
-
-})();
-
 // ---------- Boot ----------
 
-window.addEventListener('load', () => {
-  // First keydown unlocks audio context (browser policy)
-  window.addEventListener('keydown', () => Audio.unlock(), { once: true });
-
+window.addEventListener("load", () => {
+  window.addEventListener("keydown", () => Audio.unlock(), { once: true });
+  _registerNetHandlers();
+  Lobby.init();
   _lastTime = performance.now();
   requestAnimationFrame(_loop);
 });
