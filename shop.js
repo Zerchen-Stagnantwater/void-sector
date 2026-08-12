@@ -1,29 +1,31 @@
 // ============================================
-//   VOID SECTOR — shop.js
+//   VOID SECTOR — shop.js (MULTIPLAYER)
 //   Between-wave upgrade screen.
-//   Manages menu state, cursor, purchases.
-//   Renderer reads getState() to draw it.
-//   main.js calls update() each frame while
-//   in the SHOP game state.
+//   In multiplayer, purchases are sent to
+//   the server which validates and applies them.
+//   Server responds with shop_result messages.
+//   Each player navigates their own shop.
+//   Wave starts when all players press LAUNCH.
 // ============================================
 
 const Shop = (() => {
-
   // ---------- State ----------
-  let _cursor = 0;      // Selected item index
-  let _items = [];     // Built each time shop opens, with current costs/levels
-  let _message = '';     // Feedback line: "PURCHASED" / "INSUFFICIENT FUNDS" etc.
-  let _messageTimer = 0;      // Frames to show message
-  let _wave = 0;      // Wave we just completed (for display)
-  let _inputLock = 0;      // Prevent instant double-input on open
+  let _cursor = 0;
+  let _items = [];
+  let _message = "";
+  let _messageTimer = 0;
+  let _wave = 0;
+  let _inputLock = 0;
+  let _myId = null;
+  let _waitingForServer = false; // True while a purchase is in-flight
 
   // ---------- Build item list ----------
-  // Called fresh each time the shop opens so costs reflect
-  // current upgrade levels.
+  // In multiplayer, levels and costs come from
+  // the server state for THIS player.
 
-  function _buildItems() {
-    const upgrades = Player.getUpgrades();
-    _items = C.SHOP.ITEMS.map(def => {
+  function _buildItems(playerUpgrades) {
+    const upgrades = playerUpgrades || {};
+    _items = C.SHOP.ITEMS.map((def) => {
       const level = upgrades[def.id] || 0;
       const maxed = level >= def.maxLevel;
       const cost = maxed
@@ -40,11 +42,11 @@ const Shop = (() => {
       };
     });
 
-    // Add a "LEAVE SHOP" option at the bottom
+    // LAUNCH option at the bottom
     _items.push({
-      id: 'leave',
-      label: 'LAUNCH >',
-      desc: 'Begin next wave.',
+      id: "leave",
+      label: "LAUNCH >",
+      desc: "Ready up. Wave starts when all players are ready.",
       level: null,
       maxLevel: null,
       cost: null,
@@ -52,100 +54,115 @@ const Shop = (() => {
     });
   }
 
-  // ---------- Open ----------
+  // ---------- Open (multiplayer) ----------
 
-  function open(waveJustCompleted) {
-    _wave = waveJustCompleted;
+  function openMulti(wave, myId) {
+    _wave = wave;
+    _myId = myId;
     _cursor = 0;
-    _message = '';
+    _message = "";
     _messageTimer = 0;
-    _inputLock = 12;   // Lock input for 12 frames on open
-    _buildItems();
+    _inputLock = 14;
+    _waitingForServer = false;
+    _buildItems({}); // Build with empty upgrades — server will send real state shortly
   }
 
-  // ---------- Update ----------
-  // Returns true when the player chooses to leave.
+  // ---------- Update (multiplayer) ----------
+  // Returns nothing — actions are sent to server,
+  // not applied locally. Server responds via shop_result.
 
-  function update(gameState) {
+  function updateMulti(gameState) {
     if (_inputLock > 0) {
       _inputLock -= 1;
-      return false;
+      return;
+    }
+    if (_messageTimer > 0) _messageTimer -= 1;
+
+    // Rebuild items from latest server state for this player
+    const myPlayer = gameState.players.find((p) => p.id === gameState.myId);
+    if (myPlayer?.upgrades) {
+      _buildItems(myPlayer.upgrades);
     }
 
-    if (_messageTimer > 0) _messageTimer -= 1;
+    // Don't process input while waiting for a server response
+    if (_waitingForServer) return;
 
     // Navigation
     if (Input.pressed.down || Input.pressed.right) {
       _cursor = (_cursor + 1) % _items.length;
-      Audio.play('menuMove');
+      Audio.play("menuMove");
     }
     if (Input.pressed.up || Input.pressed.left) {
       _cursor = (_cursor - 1 + _items.length) % _items.length;
-      Audio.play('menuMove');
+      Audio.play("menuMove");
     }
 
     // Confirm
     if (Input.pressed.confirm) {
       const item = _items[_cursor];
 
-      if (item.id === 'leave') {
-        Audio.play('menuConfirm');
-        return true;   // Signal to main.js: leave shop
+      if (item.id === "leave") {
+        // Tell server this player is ready
+        Net.shopReady();
+        _setMessage("READY — WAITING FOR OTHERS");
+        Audio.play("menuConfirm");
+        return;
       }
 
-      _tryPurchase(item, gameState);
-    }
+      // Send purchase to server — server validates and responds
+      if (item.maxed) {
+        _setMessage("ALREADY MAXED");
+        Audio.play("shopDeny");
+        return;
+      }
 
-    return false;
+      const myScore =
+        gameState.players.find((p) => p.id === gameState.myId)?.score || 0;
+      if (myScore < item.cost) {
+        _setMessage("INSUFFICIENT FUNDS");
+        Audio.play("shopDeny");
+        return;
+      }
+
+      // Optimistic: show pending state, wait for server confirmation
+      _waitingForServer = true;
+      _setMessage("...");
+      Net.buyUpgrade(item.id);
+    }
   }
 
-  // ---------- Purchase ----------
+  // ---------- Apply server result ----------
+  // Called by main.js when server sends shop_result.
 
-  function _tryPurchase(item, gameState) {
-    if (item.maxed) {
-      _setMessage('ALREADY MAXED');
-      Audio.play('shopDeny');
-      return;
-    }
+  function applyResult(msg) {
+    _waitingForServer = false;
 
-    const score = Player.getScore();
-
-    if (score < item.cost) {
-      _setMessage('INSUFFICIENT FUNDS');
-      Audio.play('shopDeny');
-      return;
-    }
-
-    // Deduct cost — we reach into player score via a dedicated method
-    // NOTE: Player doesn't expose setScore directly. We use spendScore.
-    // We'll wire this via gameState so shop doesn't depend on player internals.
-    gameState.spendScore = item.cost;
-
-    const ok = Player.applyUpgrade(item.id);
-    if (ok) {
-      _setMessage('UPGRADE INSTALLED');
-      Audio.play('shopBuy');
-      _buildItems();   // Rebuild to show new level + updated cost
+    if (msg.success) {
+      _setMessage("UPGRADE INSTALLED");
+      Audio.play("shopBuy");
+      // Server state broadcast will update the player's upgrades and score
+      // _buildItems will be called on next updateMulti with fresh data
     } else {
-      gameState.spendScore = 0;
-      _setMessage('CANNOT UPGRADE');
-      Audio.play('shopDeny');
+      _setMessage(msg.message || "CANNOT UPGRADE");
+      Audio.play("shopDeny");
     }
   }
+
+  // ---------- Message ----------
 
   function _setMessage(msg, duration = 90) {
     _message = msg;
     _messageTimer = duration;
   }
 
-  // ---------- Read (for renderer / ui) ----------
+  // ---------- Read (for renderer) ----------
 
   function getState() {
     return {
       wave: _wave,
       cursor: _cursor,
       items: _items,
-      message: _messageTimer > 0 ? _message : '',
+      message: _messageTimer > 0 ? _message : "",
       messageTimer: _messageTimer,
     };
   }
@@ -155,17 +172,19 @@ const Shop = (() => {
   function reset() {
     _cursor = 0;
     _items = [];
-    _message = '';
+    _message = "";
     _messageTimer = 0;
     _wave = 0;
     _inputLock = 0;
+    _myId = null;
+    _waitingForServer = false;
   }
 
   return {
-    open,
-    update,
+    openMulti,
+    updateMulti,
+    applyResult,
     getState,
     reset,
   };
-
 })();
