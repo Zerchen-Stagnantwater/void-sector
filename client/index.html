@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VOID SECTOR</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body> 
+      <div id="game-wrapper">
+      <div id="scanlines"></div>
+      <canvas id="gameCanvas"></canvas>
+      <div id="crt-vignette"></div>
+    </div>
+
+    <!-- Foundation -->
+    <script src="js/core/constants.js"></script>
+    <script src="js/core/save.js"></script>
+    <script src="js/core/input.js"></script>
+    <script src="js/fx/audio.js"></script>
+
+    <!-- Multiplayer — must load before game systems -->
+    <script src="js/net/net.js"></script>
+    <script src="js/net/lobby.js"></script>
+
+    <!-- Game systems -->
+    <script src="js/fx/particles.js"></script>
+    <script src="js/game/bullets.js"></script>
+    <script src="js/game/powerups.js"></script>
+    <script src="js/game/enemies.js"></script>
+    <script src="js/game/waves.js"></script>
+    <script src="js/game/shop.js"></script>
+
+    <!-- Presentation -->
+    <script src="js/ui/renderer.js"></script>
+    <script src="js/ui/ui.js"></script>
+
+    <!-- Entry point — last -->
+    <script src="js/ui/main.js"></script>
+  </body>
+</html>
