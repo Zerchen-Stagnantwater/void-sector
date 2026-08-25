@@ -153,10 +153,10 @@ function _route(ws, msg) {
         player.input.held.bomb  = !!msg.held.bomb;
       }
       if (msg.pressed && typeof msg.pressed === 'object') {
-        // OR with existing — don't overwrite a press that hasn't been consumed yet
-        player.input.pressed.roll    = player.input.pressed.roll    || !!msg.pressed.roll;
-        player.input.pressed.bomb    = player.input.pressed.bomb    || !!msg.pressed.bomb;
-        player.input.pressed.confirm = player.input.pressed.confirm || !!msg.pressed.confirm;
+        // Only set true — never clear here. gameLoop clears pressed after consuming.
+        if (msg.pressed.roll)    player.input.pressed.roll    = true;
+        if (msg.pressed.bomb)    player.input.pressed.bomb    = true;
+        if (msg.pressed.confirm) player.input.pressed.confirm = true;
       }
       break;
     }
@@ -169,7 +169,11 @@ function _route(ws, msg) {
       const room = RM.getRoom(conn.roomCode);
       if (!room) return;
 
-      GL.handleShopBuy(room, conn.playerId, msg.itemId);
+      // Validate itemId is a safe plain string before passing to game logic
+      const itemId = msg.itemId;
+      if (typeof itemId !== 'string' || itemId.length > 32) return;
+
+      GL.handleShopBuy(room, conn.playerId, itemId);
       break;
     }
 

@@ -150,9 +150,14 @@ function playerLeft(ws) {
     }
   }
 
-  // Promote new host if host left during lobby
-  if (room.state === 'LOBBY' && playerId === room.hostId) {
-    const next = room.players.find(p => p.id !== playerId && p.connected);
+  // Auto-ready disconnected player so shop doesn't soft-lock
+  if (room.shopReady && Array.isArray(room.shopReady)) {
+    room.shopReady[playerId] = true;
+  }
+
+  // Host migration across ALL states — not just lobby
+  if (playerId === room.hostId) {
+    const next = room.players.find(p => p.connected);
     if (next) room.hostId = next.id;
   }
 
