@@ -644,7 +644,9 @@ function _checkEnemyBulletHits(room) {
 
 function _checkAllDead(room) {
   const anyAlive = room.players.some(p => p.alive && p.connected);
-  if (!anyAlive) {
+  if (!anyAlive && room.state === 'PLAYING') {
+    // Set state immediately to prevent re-entry from further ticks
+    room.state = 'GAME_OVER';
     setTimeout(() => _endGame(room), 1500);
   }
 }
@@ -706,13 +708,21 @@ function _checkWaveComplete(room) {
   if (gs.enemies.length > 0) return;
   if (room.state !== 'PLAYING') return;
 
+  // Transition state immediately to prevent re-entry
+  room.state = 'SHOP';
+
   // Award wave clear bonus to all living players
+  const bonus = C.SCORE.WAVE_CLEAR_BONUS + (gs.wave - 1) * 100;
   for (const p of room.players) {
     if (!p.alive || !p.connected) continue;
-    p.score += C.SCORE.WAVE_CLEAR_BONUS + (gs.wave - 1) * 100;
+    p.score += bonus;
   }
 
-  RM.broadcast(room, { type: 'event', event: 'wave_clear', x: 0, y: 0, data: {} });
+  RM.broadcast(room, {
+    type: 'event', event: 'wave_clear',
+    x: 0, y: 0,
+    data: { bonus, wave: gs.wave },
+  });
 
   _openShop(room);
 }
@@ -835,11 +845,9 @@ function _wRand(weights, keys) {
 // ============================================
 
 function _openShop(room) {
-  room.state    = 'SHOP';
-  room.shopReady= room.players.map(() => false);
-
-  // Tell clients shop is open via next state broadcast
-  // (roomState field will be SHOP)
+  // room.state already set to 'SHOP' by _checkWaveComplete
+  room.shopReady = room.players.map(() => false);
+  // State broadcast will carry roomState: 'SHOP' to all clients
 }
 
 function handleShopBuy(room, playerId, itemId) {
@@ -912,7 +920,7 @@ function handleShopReady(room, playerId) {
 function _endGame(room) {
   clearInterval(room.tickInterval);
   room.tickInterval = null;
-  room.state        = 'GAME_OVER';
+  // room.state already set to 'GAME_OVER' by _checkAllDead
 
   const stats = room.players
     .filter(p => p.connected)
