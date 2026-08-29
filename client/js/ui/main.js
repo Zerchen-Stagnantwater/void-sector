@@ -45,12 +45,7 @@ let gameState = {
 
 // ---------- Player identity ----------
 
-const PLAYER_IDENTITY = [
-  { id: 0, char: '^', color: '#00ff41' },
-  { id: 1, char: '^', color: '#00ccff' },
-  { id: 2, char: '^', color: '#ffaa00' },
-  { id: 3, char: '^', color: '#ff00aa' },
-];
+// PLAYER_IDENTITY defined in constants.js
 
 // ---------- Server message handlers ----------
 
@@ -293,10 +288,10 @@ function _updateShop() {
 }
 
 function _updateGameOver() {
-  // Wait for a moment before accepting input (avoid instant skip)
-  if (gameState.frame < 90) return;
+  // Accept any confirm key after a short delay
+  if (gameState.frame < 60) return;
 
-  if (Input.pressed.confirm) {
+  if (Input.pressed.confirm || Input.pressed.pause) {
     Audio.play('menuConfirm');
     _quitToLobby();
   }
@@ -343,7 +338,11 @@ function _loop(timestamp) {
 
   if (gameState.screen === SCREEN.LOBBY) {
     const canvas = document.getElementById('gameCanvas');
-    Lobby.draw(canvas.getContext('2d'));
+    const lctx   = canvas.getContext('2d');
+    // Clear to black first — renderer skips draw during LOBBY
+    lctx.fillStyle = '#000';
+    lctx.fillRect(0, 0, canvas.width, canvas.height);
+    Lobby.draw(lctx);
   }
 }
 
