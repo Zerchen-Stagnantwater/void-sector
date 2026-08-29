@@ -9,21 +9,21 @@ const Input = (() => {
 
   // held[key]    = true while key is held down
   // pressed[key] = true for exactly ONE frame after keydown
-  const held = {};
+  const held    = {};
   const pressed = {};
   const _justPressed = {};  // raw buffer, cleared each frame
 
   // Key aliases — map multiple keys to one action name
   const BINDINGS = {
-    left: ['ArrowLeft', 'a', 'A'],
+    left:  ['ArrowLeft',  'a', 'A'],
     right: ['ArrowRight', 'd', 'D'],
     shoot: ['Space', ' ', 'ArrowUp', 'w', 'W', 'z', 'Z'],
-    roll: ['ShiftLeft', 'Shift', 'x', 'X'],
-    pause: ['Escape', 'p', 'P'],
+    roll:  ['ShiftLeft', 'Shift', 'x', 'X'],
+    pause: ['Escape'],
     confirm: ['Enter', 'Space', ' ', 'z', 'Z'],
-    up: ['ArrowUp', 'w', 'W'],
-    down: ['ArrowDown', 's', 'S'],
-    bomb: ['b', 'B'],
+    up:    ['ArrowUp',   'w', 'W'],
+    down:  ['ArrowDown', 's', 'S'],
+    bomb:  ['b', 'B'],
   };
 
   // Reverse lookup: rawKey → [actionName, ...]
@@ -37,7 +37,7 @@ const Input = (() => {
 
   function onKeyDown(e) {
     // Prevent page scroll on arrows/space
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', ' '].includes(e.key)) {
+    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space',' '].includes(e.key)) {
       e.preventDefault();
     }
 
@@ -67,7 +67,7 @@ const Input = (() => {
 
   // Attach listeners
   window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('keyup',   onKeyUp);
 
   return { held, pressed, update };
 
