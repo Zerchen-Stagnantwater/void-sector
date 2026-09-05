@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VOID SECTOR</title>
+  <link rel="stylesheet" src="./style.css" />
+</head>
+<body>
+  <div id="game-wrapper">
+    <div id="scanlines"></div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="crt-vignette"></div>
+  </div>
+
+  <!--
+    Vite handles all imports from main.ts.
+    No manual script load order needed.
+    TypeScript module imports replace the old
+    global-variable dependency chain.
+  -->
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
