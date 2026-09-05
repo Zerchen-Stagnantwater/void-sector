@@ -1,0 +1,15 @@
+{
+  "name": "void-sector",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:server":   "npm run dev --workspace=packages/server",
+    "build:shared": "npm run build --workspace=packages/shared",
+    "build:server": "npm run build --workspace=packages/server",
+    "build":        "npm run build:shared && npm run build:server",
+    "check":        "tsc --noEmit --project packages/shared/tsconfig.json && tsc --noEmit --project packages/server/tsconfig.json"
+  }
+}
