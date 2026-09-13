@@ -13,8 +13,8 @@ export function drawLobbyConnecting(ctx: CanvasRenderingContext2D, errorMsg: str
 }
 
 export function drawLobbyMenu(ctx: CanvasRenderingContext2D, cursor: number): void {
-  tc(ctx, '[ VOID SECTOR ]', C.CANVAS_H * 0.2,  C.COLOR.PRIMARY, 1,   C.FONT_SIZE * 1.4, true);
-  tc(ctx, 'MULTIPLAYER',     C.CANVAS_H * 0.32, C.COLOR.DIM,     0.7, C.FONT_SIZE * 0.8);
+  tc(ctx, '[ VOID SECTOR ]', C.CANVAS_H * 0.2, C.COLOR.PRIMARY, 1, C.FONT_SIZE * 1.4, true);
+  tc(ctx, 'MULTIPLAYER', C.CANVAS_H * 0.32, C.COLOR.DIM, 0.7, C.FONT_SIZE * 0.8);
   const opts = ['CREATE ROOM', 'JOIN ROOM'];
   const btnCX = C.CANVAS_W / 2, btnGap = C.CANVAS_W * 0.28, btnY = C.CANVAS_H * 0.5;
   for (let i = 0; i < 2; i++) {
@@ -73,7 +73,7 @@ export function drawLobbyRoomWait(
     ctx.fillStyle = color; ctx.globalAlpha = filled ? 1 : 0.25;
     ctx.fillText('^', x - ctx.measureText('^').width / 2, slotY);
     ctx.font = `${C.FONT_SIZE * 0.75}px ${C.FONT_FAMILY}`;
-    const label = filled ? `P${i+1}${isMe ? ' (YOU)' : ''}` : '------';
+    const label = filled ? `P${i + 1}${isMe ? ' (YOU)' : ''}` : '------';
     ctx.fillText(label, x - ctx.measureText(label).width / 2, slotY + C.CHAR_H * 1.3);
     ctx.globalAlpha = 1;
   }
@@ -82,18 +82,18 @@ export function drawLobbyRoomWait(
     if (Math.floor(Date.now() / 500) % 2 === 0)
       tc(ctx, '[ PRESS ENTER TO START ]', C.CANVAS_H * 0.72, C.COLOR.ACCENT, 1, C.FONT_SIZE * 0.95, true);
   } else {
-    tc(ctx, `WAITING FOR HOST TO START${'.'.repeat(Math.floor(Date.now()/400)%4)}`,
+    tc(ctx, `WAITING FOR HOST TO START${'.'.repeat(Math.floor(Date.now() / 400) % 4)}`,
       C.CANVAS_H * 0.72, C.COLOR.DIM, 0.6, C.FONT_SIZE * 0.82);
   }
   tc(ctx, `SHARE CODE: ${roomCode}`, C.CANVAS_H * 0.85, C.COLOR.DIM, 0.45, C.FONT_SIZE * 0.75);
 }
 
 export function drawLobbyError(ctx: CanvasRenderingContext2D, errorMsg: string): void {
-  tc(ctx, '[ ERROR ]', C.CANVAS_H * 0.4,  C.COLOR.DANGER, 1,   C.FONT_SIZE * 1.1, true);
-  tc(ctx, errorMsg,    C.CANVAS_H * 0.54, C.COLOR.WARN,   0.9, C.FONT_SIZE * 0.85);
+  tc(ctx, '[ ERROR ]', C.CANVAS_H * 0.4, C.COLOR.DANGER, 1, C.FONT_SIZE * 1.1, true);
+  tc(ctx, errorMsg, C.CANVAS_H * 0.54, C.COLOR.WARN, 0.9, C.FONT_SIZE * 0.85);
 }
 
-function tc(ctx: CanvasRenderingContext2D, text: string, y: number, color: string, alpha = 1, size = C.FONT_SIZE, bold = false): void {
+function tc(ctx: CanvasRenderingContext2D, text: string, y: number, color: string, alpha = 1, size: number = C.FONT_SIZE, bold = false): void {
   ctx.font = `${bold ? 'bold ' : ''}${size}px ${C.FONT_FAMILY}`;
   ctx.globalAlpha = alpha; ctx.fillStyle = color;
   ctx.fillText(text, (C.CANVAS_W - ctx.measureText(text).width) / 2, y);

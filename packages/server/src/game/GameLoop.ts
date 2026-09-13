@@ -27,7 +27,7 @@ export function startGame(room: Room): void {
 
   if (room.lobbyTimer) clearTimeout(room.lobbyTimer);
 
-  room.phase     = 'PLAYING';
+  room.phase = 'PLAYING';
   room.gameState = makeGameState();
 
   // Reset all players
@@ -40,8 +40,8 @@ export function startGame(room: Room): void {
   _startNextWave(room);
 
   broadcast(room, {
-    type:    'game_start',
-    wave:    room.gameState.wave,
+    type: 'game_start',
+    wave: room.gameState.wave,
     players: room.players.map(serializePlayer),
   });
 
@@ -54,6 +54,7 @@ export function startGame(room: Room): void {
 function _tick(room: Room): void {
   const gs = room.gameState;
   if (!gs) return;
+  if (room.phase === 'GAME_OVER') return; // frozen — waiting on endGame's timeout
 
   gs.frame++;
 
@@ -77,6 +78,16 @@ function _tick(room: Room): void {
   // 6. Enemy bullet hits on players
   for (const p of livePlayers) {
     if (!p.invincible) damagePlayer(p, room, false);
+  }
+
+  // 6b. Did that just kill the last player standing? Must run before the
+  // wave-complete check below — otherwise a breach/hit that empties both
+  // gs.enemies AND the player pool in the same tick opens the shop for
+  // zero living players instead of ending the game.
+  const justEnded = checkAllDead(room);
+  if (justEnded) {
+    if (gs.frame % BROADCAST_EVERY === 0) _broadcastState(room, gs);
+    return;
   }
 
   // 7. Spawner
@@ -114,8 +125,8 @@ function _tickSpawner(room: Room, gs: GameState): void {
 // ---------- Wave complete ----------
 
 function _checkWaveComplete(room: Room, gs: GameState): void {
-  if (!gs.allSpawned)          return;
-  if (gs.enemies.length > 0)   return;
+  if (!gs.allSpawned) return;
+  if (gs.enemies.length > 0) return;
   if (room.phase !== 'PLAYING') return;
 
   // Transition immediately to prevent re-entry
@@ -128,11 +139,11 @@ function _checkWaveComplete(room: Room, gs: GameState): void {
   }
 
   broadcast(room, {
-    type:  'event',
+    type: 'event',
     event: 'wave_clear',
-    x:     0,
-    y:     0,
-    data:  { bonus, wave: gs.wave },
+    x: 0,
+    y: 0,
+    data: { bonus, wave: gs.wave },
   });
 
   openShop(room);
@@ -147,12 +158,12 @@ export function startNextWave(room: Room): void {
   room.phase = 'PLAYING';
 
   gs.wave++;
-  gs.enemies    = [];
-  gs.bullets    = [];
-  gs.drops      = [];
+  gs.enemies = [];
+  gs.bullets = [];
+  gs.drops = [];
   gs.spawnTimer = 0;
   gs.allSpawned = false;
-  gs.interlude  = 90;
+  gs.interlude = 90;
 
   const playerCount = room.players.filter(p => p.connected).length;
   gs.spawnQueue = buildWave(gs.wave, playerCount);
@@ -162,12 +173,12 @@ export function startNextWave(room: Room): void {
   const startCols = C.PLAYER_START_COLS;
   for (const p of room.players) {
     if (!p.alive || !p.connected) continue;
-    p.x            = startCols[p.id] ?? C.COLS / 2;
-    p.y            = C.PLAYER.START_ROW;
-    p.invincible   = false;
-    p.invTimer     = 0;
-    p.rolling      = false;
-    p.shootCooldown= 0;
+    p.x = startCols[p.id] ?? C.COLS / 2;
+    p.y = C.PLAYER.START_ROW;
+    p.invincible = false;
+    p.invTimer = 0;
+    p.rolling = false;
+    p.shootCooldown = 0;
   }
 
   broadcast(room, { type: 'wave_start', wave: gs.wave });
@@ -179,13 +190,16 @@ function _startNextWave(room: Room): void {
 }
 
 // ---------- All dead check ----------
+// Returns true if this call just transitioned the room to GAME_OVER.
 
-export function checkAllDead(room: Room): void {
+export function checkAllDead(room: Room): boolean {
   const anyAlive = room.players.some(p => p.alive && p.connected);
   if (!anyAlive && room.phase === 'PLAYING') {
     room.phase = 'GAME_OVER';
     setTimeout(() => endGame(room), 1500);
+    return true;
   }
+  return false;
 }
 
 // ---------- Game over ----------
@@ -201,8 +215,8 @@ function endGame(room: Room): void {
     .map(p => ({ id: p.id, score: p.score, kills: p.kills }));
 
   broadcast(room, {
-    type:  'game_over',
-    wave:  room.gameState?.wave ?? 0,
+    type: 'game_over',
+    wave: room.gameState?.wave ?? 0,
     stats,
   });
 
@@ -214,38 +228,38 @@ function endGame(room: Room): void {
 function _broadcastState(room: Room, gs: GameState): void {
   const shopState = room.phase === 'SHOP'
     ? {
-        readyFlags: room.shopReady,
-        players:    room.players
-          .filter(p => p.connected)
-          .map(p => ({ id: p.id, score: p.score, upgrades: p.upgrades })),
-      }
+      readyFlags: room.shopReady,
+      players: room.players
+        .filter(p => p.connected)
+        .map(p => ({ id: p.id, score: p.score, upgrades: p.upgrades })),
+    }
     : null;
 
   broadcast(room, {
-    type:      'state',
-    frame:     gs.frame,
-    wave:      gs.wave,
+    type: 'state',
+    frame: gs.frame,
+    wave: gs.wave,
     roomState: room.phase,
-    players:   room.players.map(serializePlayer),
-    enemies:   gs.enemies.map(e => ({
-      id:         e.id,
-      type:       e.type,
-      x:          e.x,
-      y:          e.y,
-      hp:         e.hp,
-      maxHp:      e.maxHp,
-      char:       e.char,
+    players: room.players.map(serializePlayer),
+    enemies: gs.enemies.map(e => ({
+      id: e.id,
+      type: e.type,
+      x: e.x,
+      y: e.y,
+      hp: e.hp,
+      maxHp: e.maxHp,
+      char: e.char,
       flashTimer: e.flashTimer,
     })),
     bullets: gs.bullets.map(b => ({
-      id:    b.id,
+      id: b.id,
       owner: b.owner,
-      x:     b.x,
-      y:     b.y,
-      char:  b.char,
+      x: b.x,
+      y: b.y,
+      char: b.char,
       color: b.color,
     })),
-    drops:     gs.drops,
+    drops: gs.drops,
     shopState,
   });
 }
@@ -254,41 +268,41 @@ function _broadcastState(room: Room, gs: GameState): void {
 
 function makeGameState(): GameState {
   return {
-    frame:         0,
-    wave:          0,
-    enemies:       [],
-    bullets:       [],
-    drops:         [],
-    spawnQueue:    [],
-    spawnTimer:    0,
-    allSpawned:    false,
-    interlude:     0,
-    _nextEnemyId:  0,
+    frame: 0,
+    wave: 0,
+    enemies: [],
+    bullets: [],
+    drops: [],
+    spawnQueue: [],
+    spawnTimer: 0,
+    allSpawned: false,
+    interlude: 0,
+    _nextEnemyId: 0,
     _nextBulletId: 0,
-    _nextDropId:   0,
+    _nextDropId: 0,
   };
 }
 
 function resetPlayer(p: ServerPlayer, startCol: number): void {
-  p.x             = startCol;
-  p.y             = C.PLAYER.START_ROW;
-  p.lives         = C.PLAYER.LIVES;
-  p.score         = 0;
-  p.kills         = 0;
-  p.combo         = 0;
-  p.comboTimer    = 0;
-  p.rolling       = false;
-  p.rollTimer     = 0;
-  p.rollCooldown  = 0;
-  p.invincible    = false;
-  p.invTimer      = 0;
+  p.x = startCol;
+  p.y = C.PLAYER.START_ROW;
+  p.lives = C.PLAYER.LIVES;
+  p.score = 0;
+  p.kills = 0;
+  p.combo = 0;
+  p.comboTimer = 0;
+  p.rolling = false;
+  p.rollTimer = 0;
+  p.rollCooldown = 0;
+  p.invincible = false;
+  p.invTimer = 0;
   p.shootCooldown = 0;
-  p.bombs         = 0;
-  p.shieldActive  = false;
-  p.shieldHits    = 0;
-  p.alive         = true;
-  p.effects.rapid.active      = false;
-  p.effects.rapid.framesLeft  = 0;
-  p.effects.spread.active     = false;
+  p.bombs = 0;
+  p.shieldActive = false;
+  p.shieldHits = 0;
+  p.alive = true;
+  p.effects.rapid.active = false;
+  p.effects.rapid.framesLeft = 0;
+  p.effects.spread.active = false;
   p.effects.spread.framesLeft = 0;
 }

@@ -13,16 +13,16 @@ import { sendTo } from '../room/RoomManager.js';
 // ---------- Open ----------
 
 export function openShop(room: Room): void {
-  room.phase     = 'SHOP';
+  room.phase = 'SHOP';
   room.shopReady = room.players.map(() => false);
 }
 
 // ---------- Buy ----------
 
 export function handleShopBuy(
-  room:     Room,
+  room: Room,
   playerId: number,
-  itemId:   UpgradeId,
+  itemId: UpgradeId,
 ): void {
   if (room.phase !== 'SHOP') return;
 
@@ -56,22 +56,22 @@ export function handleShopBuy(
   }
 
   // Apply
-  player.score             -= cost;
-  player.upgrades[itemId]   = level + 1;
+  player.score -= cost;
+  player.upgrades[itemId] = level + 1;
 
   // Shield upgrade gives immediate shield
   if (itemId === 'shield') {
     player.shieldActive = true;
-    player.shieldHits   = C.POWERUP.SHIELD_HITS;
+    player.shieldHits = C.POWERUP.SHIELD_HITS;
   }
 
   sendTo(socket, {
-    type:     'shop_result',
-    success:  true,
+    type: 'shop_result',
+    success: true,
     itemId,
     newLevel: player.upgrades[itemId],
     newScore: player.score,
-    message:  'UPGRADE INSTALLED',
+    message: 'UPGRADE INSTALLED',
   });
 }
 
@@ -84,5 +84,6 @@ export function handleShopReady(room: Room, playerId: number): boolean {
   room.shopReady[playerId] = true;
 
   const activePlayers = room.players.filter(p => p.connected && p.alive);
+  if (activePlayers.length === 0) return false;
   return activePlayers.every(p => room.shopReady[p.id] === true);
 }

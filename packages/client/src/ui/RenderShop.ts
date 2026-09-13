@@ -137,7 +137,7 @@ function sf(size: number, bold = false): void {
   _ctx.font = `${bold ? 'bold ' : ''}${size}px ${C.FONT_FAMILY}`;
 }
 
-function tc(text: string, y: number, color: string, alpha = 1, size = C.FONT_SIZE, bold = false): void {
+function tc(text: string, y: number, color: string, alpha = 1, size: number = C.FONT_SIZE, bold = false): void {
   sf(size, bold);
   _ctx.globalAlpha = alpha;
   _ctx.fillStyle = color;

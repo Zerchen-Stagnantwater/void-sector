@@ -54,13 +54,18 @@ export interface MsgShopReady {
   type: 'shop_ready';
 }
 
+export interface MsgLeave {
+  type: 'leave';
+}
+
 export type ClientMessage =
   | MsgCreate
   | MsgJoin
   | MsgStart
   | MsgInput
   | MsgShopBuy
-  | MsgShopReady;
+  | MsgShopReady
+  | MsgLeave;
 
 // ============================================
 //   SERVER → CLIENT

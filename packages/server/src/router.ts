@@ -169,12 +169,22 @@ function dispatch(socket: AppSocket, msg: ClientMessage): void {
       if (allReady) startNextWave(room);
       break;
     }
+
+    // ---- Leave ----
+    // Explicit "quit to lobby" — same cleanup as a real disconnect, but
+    // the socket itself stays connected so the client can create/join
+    // another room afterward.
+
+    case 'leave': {
+      leaveCurrentRoom(socket);
+      break;
+    }
   }
 }
 
-// ---------- Disconnect ----------
+// ---------- Leave / disconnect (shared) ----------
 
-function handleDisconnect(socket: AppSocket): void {
+function leaveCurrentRoom(socket: AppSocket): void {
   const result = playerLeft(socket);
   if (!result?.room) return;
 
@@ -188,6 +198,10 @@ function handleDisconnect(socket: AppSocket): void {
   });
 
   checkAllDead(room);
+}
+
+function handleDisconnect(socket: AppSocket): void {
+  leaveCurrentRoom(socket);
 }
 
 // ---------- Health stats (for logging) ----------

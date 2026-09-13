@@ -15,17 +15,17 @@ import { drawHUD, initHUDRenderer } from './RenderHUD.js';
 // ---------- Canvas refs (set once by Renderer.ts) ----------
 
 let _ctx: CanvasRenderingContext2D;
-let _CW:  number;
-let _CH:  number;
+let _CW: number;
+let _CH: number;
 
 export function initPlayingRenderer(
   ctx: CanvasRenderingContext2D,
-  CW:  number,
-  CH:  number,
+  CW: number,
+  CH: number,
 ): void {
   _ctx = ctx;
-  _CW  = CW;
-  _CH  = CH;
+  _CW = CW;
+  _CH = CH;
   initHUDRenderer(ctx, CW, CH);
 }
 
@@ -41,12 +41,30 @@ export function drawPlaying(gs: ClientGameState): void {
   drawFloatTexts();
   drawBorder();
 
+  const me = gs.players.find(p => p.id === gs.myId);
+  if (me && !me.alive) drawSpectating(gs);
+
   // Wave banner
   if (gs.showWaveBanner && gs.waveBannerAlpha > 0) {
     tc(`-- WAVE ${gs.wave} --`,
       C.CANVAS_H * 0.45,
       C.COLOR.PRIMARY, gs.waveBannerAlpha, C.FONT_SIZE * 1.2, true);
   }
+}
+
+// ---------- Spectating (own player dead, room still playing) ----------
+
+function drawSpectating(gs: ClientGameState): void {
+  const anyoneAlive = gs.players.some(p => p.alive);
+  const text = anyoneAlive ? 'YOU ARE DOWN — SPECTATING' : 'ALL PLAYERS DOWN';
+
+  sf(C.FONT_SIZE * 0.8, true);
+  _ctx.globalAlpha = 0.55 + Math.sin(gs.frame * 0.05) * 0.15;
+  _ctx.fillStyle = C.COLOR.DANGER;
+  const w = _ctx.measureText(text).width;
+  _ctx.fillText(text, (C.CANVAS_W - w) / 2, C.CANVAS_H - _CH * 1.5);
+  _ctx.globalAlpha = 1;
+  sf(C.FONT_SIZE);
 }
 
 // ---------- Players ----------
@@ -58,7 +76,7 @@ function drawPlayers(gs: ClientGameState): void {
     if (!p.alive) continue;
 
     const identity = PLAYER_IDENTITY[p.id] ?? PLAYER_IDENTITY[0]!;
-    const isMe     = p.id === gs.myId;
+    const isMe = p.id === gs.myId;
 
     // Invincibility blink
     if (p.invincible && !p.rolling) {
@@ -67,7 +85,7 @@ function drawPlayers(gs: ClientGameState): void {
 
     // Shield glow
     if (p.shieldActive) {
-      const offsets = [[-1,0],[1,0],[0,-0.6],[0,0.6],[-0.7,-0.4],[0.7,-0.4],[-0.7,0.4],[0.7,0.4]];
+      const offsets = [[-1, 0], [1, 0], [0, -0.6], [0, 0.6], [-0.7, -0.4], [0.7, -0.4], [-0.7, 0.4], [0.7, 0.4]];
       for (const [ox, oy] of offsets) {
         dc('·', p.x + (ox ?? 0), p.y + (oy ?? 0), C.COLOR.SHIELD, 0.5);
       }
@@ -82,7 +100,7 @@ function drawPlayers(gs: ClientGameState): void {
     // Color shifts for powerups
     let color = identity.color;
     if (p.effects?.spread?.active) color = C.COLOR.ACCENT;
-    if (p.effects?.rapid?.active)  color = C.COLOR.WARN;
+    if (p.effects?.rapid?.active) color = C.COLOR.WARN;
 
     dc('^', p.x, p.y, color, isMe ? 1.0 : 0.75);
 
@@ -115,10 +133,10 @@ function drawEnemies(gs: ClientGameState): void {
       const barX = cx(e.x) - barW / 2;
       const barY = cy(e.y) - _CH + 4;
       const frac = e.hp / e.maxHp;
-      _ctx.fillStyle   = '#330000';
+      _ctx.fillStyle = '#330000';
       _ctx.globalAlpha = 0.7;
       _ctx.fillRect(barX, barY, barW, 3);
-      _ctx.fillStyle   = C.COLOR.DANGER;
+      _ctx.fillStyle = C.COLOR.DANGER;
       _ctx.globalAlpha = 0.9;
       _ctx.fillRect(barX, barY, barW * frac, 3);
       _ctx.globalAlpha = 1;
@@ -160,7 +178,7 @@ function drawFloatTexts(): void {
 
 export function drawBorder(): void {
   _ctx.strokeStyle = C.COLOR.DIM;
-  _ctx.lineWidth   = 1;
+  _ctx.lineWidth = 1;
   _ctx.globalAlpha = 0.4;
   _ctx.strokeRect(1, 1, C.CANVAS_W - 2, C.CANVAS_H - 2);
   _ctx.globalAlpha = 1;
@@ -177,15 +195,15 @@ function sf(size: number, bold = false): void {
 
 function dc(char: string, col: number, row: number, color: string, alpha = 1): void {
   _ctx.globalAlpha = alpha;
-  _ctx.fillStyle   = color;
+  _ctx.fillStyle = color;
   _ctx.fillText(char, cx(col), cy(row));
   _ctx.globalAlpha = 1;
 }
 
-function tc(text: string, y: number, color: string, alpha = 1, size = C.FONT_SIZE, bold = false): void {
+function tc(text: string, y: number, color: string, alpha = 1, size: number = C.FONT_SIZE, bold = false): void {
   sf(size, bold);
   _ctx.globalAlpha = alpha;
-  _ctx.fillStyle   = color;
+  _ctx.fillStyle = color;
   const w = _ctx.measureText(text).width;
   _ctx.fillText(text, (C.CANVAS_W - w) / 2, y);
   _ctx.globalAlpha = 1;

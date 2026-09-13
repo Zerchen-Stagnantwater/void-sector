@@ -125,6 +125,7 @@ export const startGame = (): void => send({ type: 'start' });
 export const buyUpgrade = (itemId: import('@void-sector/shared').UpgradeId): void =>
   send({ type: 'shop_buy', itemId });
 export const shopReady = (): void => send({ type: 'shop_ready' });
+export const leaveRoom = (): void => send({ type: 'leave' });
 
 // ---------- State ----------
 

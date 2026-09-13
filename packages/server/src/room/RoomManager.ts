@@ -114,6 +114,12 @@ export function playerLeft(socket: AppSocket): LeaveResult | null {
 
   room.sockets.delete(playerId);
 
+  // Socket stays alive (this may be an explicit 'leave', not a real
+  // disconnect) — clear its room association so a stray message after
+  // leaving can't act on a room/player slot it no longer occupies.
+  delete socket.data.roomCode;
+  delete socket.data.playerId;
+
   const anyConnected = room.players.some(p => p.connected);
   if (!anyConnected) {
     destroyRoom(roomCode, 'ALL_DISCONNECTED');

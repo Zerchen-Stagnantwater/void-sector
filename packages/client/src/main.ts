@@ -159,6 +159,7 @@ function enterGameOver(msg: MsgGameOver): void {
 }
 
 function quitToLobby(): void {
+  Net.leaveRoom();
   gs.screen = 'LOBBY';
   gs.players = [];
   gs.enemies = [];
@@ -204,7 +205,18 @@ function updateLobbyScreen(): void {
 }
 
 function updatePlaying(): void {
-  if (pressed('pause') && gs.screen === 'PLAYING') togglePause();
+  if (pressed('pause') && gs.screen === 'PLAYING') {
+    togglePause();
+    if (isPaused()) {
+      // Freeze on the server immediately — otherwise it keeps replaying
+      // whatever was last held (e.g. still moving) until we unpause.
+      Net.send({
+        type: 'input',
+        held: { left: false, right: false, shoot: false, roll: false, bomb: false },
+        pressed: { roll: false, bomb: false, confirm: false },
+      });
+    }
+  }
 
   if (isPaused()) {
     const result = updateUI();
