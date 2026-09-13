@@ -12,8 +12,8 @@ import { broadcast } from '../room/RoomManager.js';
 // ---------- Player damage ----------
 
 export function damagePlayer(
-  p:        ServerPlayer,
-  room:     Room,
+  p: ServerPlayer,
+  room: Room,
   breached: boolean,
 ): void {
   const gs = room.gameState;
@@ -23,8 +23,8 @@ export function damagePlayer(
     // Check enemy bullet hits
     const hits = gs.bullets.filter(
       b => b.owner === 'enemy' &&
-           Math.abs(b.x - p.x) < 0.8 &&
-           Math.abs(b.y - p.y) < 0.8,
+        Math.abs(b.x - p.x) < 0.8 &&
+        Math.abs(b.y - p.y) < 0.8,
     );
     if (hits.length === 0) return;
     for (const b of hits) {
@@ -40,7 +40,7 @@ export function damagePlayer(
     p.shieldHits--;
     if (p.shieldHits <= 0) p.shieldActive = false;
     p.invincible = true;
-    p.invTimer   = 30;
+    p.invTimer = 30;
     broadcast(room, {
       type: 'event', event: 'shield_hit',
       x: p.x, y: p.y,
@@ -51,7 +51,7 @@ export function damagePlayer(
 
   p.lives--;
   p.invincible = true;
-  p.invTimer   = C.PLAYER.INVINCIBLE_FRAMES;
+  p.invTimer = C.PLAYER.INVINCIBLE_FRAMES;
 
   if (p.lives <= 0) {
     p.alive = false;
@@ -66,35 +66,5 @@ export function damagePlayer(
       x: p.x, y: p.y,
       data: { playerId: p.id },
     });
-  }
-}
-
-// ---------- Helpers ----------
-
-function clampX(x: number): number {
-  return Math.max(1, Math.min(C.COLS - 2, x));
-}
-
-function nearestPlayer(
-  e:       ServerEnemy,
-  players: ServerPlayer[],
-): ServerPlayer | undefined {
-  let nearest: ServerPlayer | undefined;
-  let minDist = Infinity;
-
-  for (const p of players) {
-    const dx = p.x - e.x;
-    const dy = p.y - e.y;
-    const d  = dx * dx + dy * dy;
-    if (d < minDist) { minDist = d; nearest = p; }
-  }
-
-  return nearest;
-}
-
-// Extend GameState with pending drops side-channel
-declare module '@void-sector/shared' {
-  interface GameState {
-    _pendingDrops?: Array<{ x: number; y: number }>;
   }
 }

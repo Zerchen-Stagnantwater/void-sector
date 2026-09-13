@@ -1,89 +1,76 @@
 // ============================================
 //   Net.ts
-//   WebSocket client wrapper.
+//   socket.io client wrapper.
 //   Typed send/receive using shared message types.
+//   Public API (connect/on/off/send/...) is
+//   unchanged from the raw-WebSocket version —
+//   Lobby.ts and main.ts don't need to change.
 // ============================================
 
+import { io, type Socket } from 'socket.io-client';
 import type { ClientMessage, ServerMessage } from '@void-sector/shared';
 import { held, pressed } from '../core/input.js';
 
 const SERVER_URL = window.location.hostname === 'localhost'
-  ? 'ws://localhost:8080'
-  : `wss://${window.location.hostname}:8080`;
+  ? 'http://localhost:8080'
+  : window.location.origin;
 
 // ---------- State ----------
 
-let _ws:             WebSocket | null = null;
-let _connected                        = false;
-let _reconnectDelay                   = 1000;
-let _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let _reconnecting                     = false;
-let _lastInputHash                    = '';
+let _socket: Socket | null = null;
+let _connected = false;
+let _lastInputHash = '';
 
 // Message handlers
 const _handlers = new Map<string, Array<(msg: ServerMessage) => void>>();
 
+// 'connected'/'disconnected' are internal-only events (not real server
+// messages) — handlers registered for them never read the payload, this
+// just satisfies the shared handler signature.
+const SENTINEL = { type: '__internal__' } as unknown as ServerMessage;
+
 // ---------- Connect ----------
 
 export function connect(): void {
-  if (_ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING)) return;
+  if (_socket?.connected) return;
 
   console.log('[Net] Connecting to', SERVER_URL);
-  _ws = new WebSocket(SERVER_URL);
 
-  _ws.onopen    = onOpen;
-  _ws.onclose   = onClose;
-  _ws.onerror   = onError;
-  _ws.onmessage = onMessage;
+  _socket = io(SERVER_URL, {
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 16000,
+  });
+
+  _socket.on('connect', onConnect);
+  _socket.on('disconnect', onDisconnect);
+  _socket.on('msg', onMessage);
 }
 
-function onOpen(): void {
+function onConnect(): void {
   console.log('[Net] Connected');
-  _connected      = true;
-  _reconnecting   = false;
-  _reconnectDelay = 1000;
-  if (_reconnectTimer) clearTimeout(_reconnectTimer);
-  emit('connected', { type: 'pong' }); // sentinel — handlers check type
+  _connected = true;
+  emit('connected', SENTINEL);
 }
 
-function onClose(e: CloseEvent): void {
-  console.log('[Net] Disconnected', e.code);
+function onDisconnect(reason: string): void {
+  console.log('[Net] Disconnected', reason);
   _connected = false;
-  _ws        = null;
-  emit('disconnected', { type: 'pong' });
-  scheduleReconnect();
+  emit('disconnected', SENTINEL);
+  // socket.io reconnects automatically unless the server
+  // explicitly disconnected us — no manual scheduling needed.
 }
 
-function onError(_e: Event): void {
-  // onClose fires after onerror — reconnect handled there
-}
-
-function onMessage(e: MessageEvent): void {
-  let msg: ServerMessage;
-  try {
-    msg = JSON.parse(e.data as string) as ServerMessage;
-  } catch {
-    return;
-  }
+function onMessage(msg: ServerMessage): void {
   if (!msg?.type) return;
   emit(msg.type, msg);
-}
-
-function scheduleReconnect(): void {
-  if (_reconnecting) return;
-  _reconnecting   = true;
-  _reconnectTimer = setTimeout(() => {
-    _reconnecting   = false;
-    _reconnectDelay = Math.min(_reconnectDelay * 2, 16000);
-    connect();
-  }, _reconnectDelay);
 }
 
 // ---------- Send ----------
 
 export function send(msg: ClientMessage): void {
-  if (!_connected || !_ws) return;
-  try { _ws.send(JSON.stringify(msg)); } catch { /* dead socket */ }
+  if (!_connected || !_socket) return;
+  _socket.emit('msg', msg);
 }
 
 export function sendInput(): void {
@@ -91,15 +78,15 @@ export function sendInput(): void {
 
   const input = {
     held: {
-      left:  held('left'),
+      left: held('left'),
       right: held('right'),
       shoot: held('shoot'),
-      roll:  held('roll'),
-      bomb:  held('bomb'),
+      roll: held('roll'),
+      bomb: held('bomb'),
     },
     pressed: {
-      roll:    pressed('roll'),
-      bomb:    pressed('bomb'),
+      roll: pressed('roll'),
+      bomb: pressed('bomb'),
       confirm: pressed('confirm'),
     },
   };
@@ -132,17 +119,12 @@ function emit(type: string, msg: ServerMessage): void {
 
 // ---------- Convenience senders ----------
 
-export const createRoom  = (): void => send({ type: 'create' });
-export const joinRoom    = (code: string): void => send({ type: 'join', code });
-export const startGame   = (): void => send({ type: 'start' });
-export const buyUpgrade  = (itemId: import('@void-sector/shared').UpgradeId): void =>
+export const createRoom = (): void => send({ type: 'create' });
+export const joinRoom = (code: string): void => send({ type: 'join', code });
+export const startGame = (): void => send({ type: 'start' });
+export const buyUpgrade = (itemId: import('@void-sector/shared').UpgradeId): void =>
   send({ type: 'shop_buy', itemId });
-export const shopReady   = (): void => send({ type: 'shop_ready' });
-export const ping        = (): void => send({ type: 'ping' });
-
-// ---------- Keepalive ----------
-
-setInterval(() => { if (_connected) ping(); }, 20_000);
+export const shopReady = (): void => send({ type: 'shop_ready' });
 
 // ---------- State ----------
 

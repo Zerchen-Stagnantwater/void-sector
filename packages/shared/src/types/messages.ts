@@ -32,30 +32,26 @@ export interface MsgStart {
 export interface MsgInput {
   type: 'input';
   held: {
-    left:  boolean;
+    left: boolean;
     right: boolean;
     shoot: boolean;
-    roll:  boolean;
-    bomb:  boolean;
+    roll: boolean;
+    bomb: boolean;
   };
   pressed: {
-    roll:    boolean;
-    bomb:    boolean;
+    roll: boolean;
+    bomb: boolean;
     confirm: boolean;
   };
 }
 
 export interface MsgShopBuy {
-  type:   'shop_buy';
+  type: 'shop_buy';
   itemId: UpgradeId;
 }
 
 export interface MsgShopReady {
   type: 'shop_ready';
-}
-
-export interface MsgPing {
-  type: 'ping';
 }
 
 export type ClientMessage =
@@ -64,61 +60,60 @@ export type ClientMessage =
   | MsgStart
   | MsgInput
   | MsgShopBuy
-  | MsgShopReady
-  | MsgPing;
+  | MsgShopReady;
 
 // ============================================
 //   SERVER → CLIENT
 // ============================================
 
 export interface MsgRoomCreated {
-  type:     'room_created';
-  code:     string;
+  type: 'room_created';
+  code: string;
   playerId: number;
-  isHost:   boolean;
+  isHost: boolean;
 }
 
 export interface MsgRoomJoined {
-  type:        'room_joined';
-  code:        string;
-  playerId:    number;
+  type: 'room_joined';
+  code: string;
+  playerId: number;
   playerCount: number;
-  isHost:      boolean;
+  isHost: boolean;
 }
 
 export interface MsgPlayerJoined {
-  type:        'player_joined';
-  playerId:    number;
+  type: 'player_joined';
+  playerId: number;
   playerCount: number;
 }
 
 export interface MsgPlayerLeft {
-  type:        'player_left';
-  playerId:    number;
+  type: 'player_left';
+  playerId: number;
   playerCount: number;
-  newHostId:   number | null;
+  newHostId: number | null;
 }
 
 export interface MsgError {
-  type:    'error';
+  type: 'error';
   message: 'ROOM_NOT_FOUND' | 'ROOM_FULL' | 'GAME_IN_PROGRESS' | 'NOT_HOST';
 }
 
 export interface MsgGameStart {
-  type:    'game_start';
-  wave:    number;
+  type: 'game_start';
+  wave: number;
   players: ClientPlayer[];
 }
 
 export interface MsgState {
-  type:      'state';
-  frame:     number;
-  wave:      number;
+  type: 'state';
+  frame: number;
+  wave: number;
   roomState: RoomState;
-  players:   ClientPlayer[];
-  enemies:   ClientEnemy[];
-  bullets:   ClientBullet[];
-  drops:     Drop[];
+  players: ClientPlayer[];
+  enemies: ClientEnemy[];
+  bullets: ClientBullet[];
+  drops: Drop[];
   shopState: ShopState | null;
 }
 
@@ -142,15 +137,15 @@ export type GameEventName =
   | 'wave_clear';
 
 export interface EnemyDieData {
-  enemyType:  EnemyType;
-  score:      number;
+  enemyType: EnemyType;
+  score: number;
   multiplier: number;
-  playerId:   number | null;
+  playerId: number | null;
 }
 
 export interface EnemyHitData {
   enemyType: EnemyType;
-  playerId:  number | null;
+  playerId: number | null;
 }
 
 export interface PlayerEventData {
@@ -159,12 +154,12 @@ export interface PlayerEventData {
 
 export interface PickupData {
   pickupType: DropType;
-  playerId:   number;
+  playerId: number;
 }
 
 export interface WaveClearData {
   bonus: number;
-  wave:  number;
+  wave: number;
 }
 
 export type GameEventData =
@@ -176,30 +171,26 @@ export type GameEventData =
   | Record<string, never>;
 
 export interface MsgEvent {
-  type:  'event';
+  type: 'event';
   event: GameEventName;
-  x:     number;
-  y:     number;
-  data:  GameEventData;
+  x: number;
+  y: number;
+  data: GameEventData;
 }
 
 export interface MsgShopResult {
-  type:     'shop_result';
-  success:  boolean;
-  itemId?:  UpgradeId;
+  type: 'shop_result';
+  success: boolean;
+  itemId?: UpgradeId;
   newLevel?: number;
   newScore?: number;
-  message:  string;
+  message: string;
 }
 
 export interface MsgGameOver {
-  type:  'game_over';
-  wave:  number;
+  type: 'game_over';
+  wave: number;
   stats: PlayerResult[];
-}
-
-export interface MsgPong {
-  type: 'pong';
 }
 
 export type ServerMessage =
@@ -213,5 +204,4 @@ export type ServerMessage =
   | MsgWaveStart
   | MsgEvent
   | MsgShopResult
-  | MsgGameOver
-  | MsgPong;
+  | MsgGameOver;

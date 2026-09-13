@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev":   "vite",
     "build": "vite build",
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@void-sector/shared": "*"
+    "@void-sector/shared": "*",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "typescript": "^5.4.0",

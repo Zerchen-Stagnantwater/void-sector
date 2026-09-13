@@ -1,39 +1,44 @@
 // ============================================
 //   index.ts
-//   Boot the WebSocket server.
-//   Delegates all logic to router.ts.
+//   Boot the socket.io server.
+//   Delegates all message logic to router.ts.
 // ============================================
 
-import { WebSocketServer } from 'ws';
-import { route, handleDisconnect, logHealth } from './router.js';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import { registerHandlers, logHealth } from './router.js';
+import type {
+  ClientToServerEvents, ServerToClientEvents,
+  InterServerEvents, SocketData,
+} from './socketTypes.js';
 
 const PORT = Number(process.env.PORT) || 8080;
 
-const wss = new WebSocketServer({ port: PORT });
+const httpServer = createServer();
+
+const io = new Server
+  <ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(httpServer, {
+    cors: {
+      origin: process.env.CLIENT_ORIGIN ?? '*',
+      methods: ['GET', 'POST'],
+    },
+  });
 
 console.log(`[Server] VOID SECTOR starting on port ${PORT}`);
 console.log(`[Server] ${new Date().toISOString()}`);
 
-wss.on('connection', (ws, req) => {
+io.on('connection', (socket) => {
   const ip = (
-    req.headers['x-forwarded-for'] as string | undefined ??
-    req.socket.remoteAddress ??
-    'unknown'
+    (socket.handshake.headers['x-forwarded-for'] as string | undefined) ??
+    socket.handshake.address
   ).split(',')[0]?.trim();
 
-  console.log(`[Connect] ${ip} — total: ${wss.clients.size}`);
+  console.log(`[Connect] ${ip} — total: ${io.sockets.sockets.size}`);
 
-  ws.on('message', (raw) => {
-    route(ws, raw.toString());
-  });
+  registerHandlers(socket);
 
-  ws.on('close', () => {
-    console.log(`[Disconnect] ${ip} — total: ${wss.clients.size}`);
-    handleDisconnect(ws);
-  });
-
-  ws.on('error', (err) => {
-    console.warn(`[WS Error] ${ip}:`, err.message);
+  socket.on('disconnect', () => {
+    console.log(`[Disconnect] ${ip} — total: ${io.sockets.sockets.size}`);
   });
 });
 
@@ -43,8 +48,10 @@ setInterval(logHealth, 60_000);
 // Graceful shutdown
 function shutdown(signal: string): void {
   console.log(`[Server] ${signal} — shutting down`);
-  wss.close(() => process.exit(0));
+  io.close(() => process.exit(0));
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT',  () => shutdown('SIGINT'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+httpServer.listen(PORT);
